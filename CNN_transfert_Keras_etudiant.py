@@ -48,6 +48,7 @@ plt.close('all')
 
 # Partie 1.1 Recuperation de la base de données type DataFrame
 database = pd.read_csv('./database.csv')
+
 # Paramètres
 
 # Etude sur catégorie 2 classes == 0 ou 8 classes == 1
