@@ -14,7 +14,7 @@ from skimage.transform import resize
 
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
-class Labels(Enum):
+class Labels(Enum): # Définition des labels
     ARTIFICIEL = 0
     NATUREL = 1 
     COTE = 2
@@ -26,13 +26,13 @@ class Labels(Enum):
     RUE = 8
     GRANDBATIMENT = 9
 
-def get_labels():
+def get_labels(): # Récupération des labels
     lst = []
     for name,value in Labels.__members__.items():
         lst.append(name)
     return lst
 
-def set_labels(d,col2,col8):
+def set_labels(d,col2,col8): # Remplacement des labels numériques par des labels textuels
     data = np.array(d, dtype=object)
     data[data[:,col2]==0,col2] = Labels.ARTIFICIEL.name
     data[data[:,col2]==1,col2] = Labels.NATUREL.name    
@@ -46,7 +46,7 @@ def set_labels(d,col2,col8):
     data[data[:,col8]==9,col8] = Labels.GRANDBATIMENT.name
     return pd.DataFrame(data,columns=d.columns)
 
-def unset_labels(d,col2,col8):
+def unset_labels(d,col2,col8): # Remplacement des labels textuels par des labels numériques
     data = np.array(d, dtype=object)
     data[data[:,col2]=='ARTIFICIEL',col2] = Labels.ARTIFICIEL.value
     data[data[:,col2]=='NATUREL',col2] = Labels.NATUREL.value    
@@ -60,20 +60,20 @@ def unset_labels(d,col2,col8):
     data[data[:,col8]=='GRANDBATIMENT',col8] = Labels.GRANDBATIMENT.value
     return pd.DataFrame(data,columns=d.columns)
 
-record_time = np.zeros((10,1))
+record_time = np.zeros((10,1)) # Tableau pour enregistrer les temps de calcul
 def start_time(index):
     record_time[index] = time.time()
     
-def stop_time(index):
+def stop_time(index): # Retourne le temps écoulé depuis l'appel de start_time avec le même index
     record_time[index] = time.time() - record_time[index]
     return str(float(record_time[index]))[0:7]
 
-def shake_database(path):
+def shake_database(path): # Mélange les lignes d'une base de données CSV
     database = pd.read_csv(path)
     database = database.sample(frac=1)
     database.to_csv(path,index=False)
     
-def show_database(data,col2,col8):
+def show_database(data,col2,col8): # Affiche le nombre d'éléments par classe dans la base de données
     data = np.array(data)
     print("Contenu Total: "+str(len(data)))
     print("Classée Artificielle: "+str(len(data[data[:,col2]==Labels.ARTIFICIEL.name,col2])))
@@ -92,7 +92,7 @@ def show_database(data,col2,col8):
     
     return X,Y
 
-def lire_images(root_dir, path_cvs ,num, sous_ech=2):
+def lire_images(root_dir, path_cvs ,num, sous_ech=2): # Lecture des images et des classes
     T=[]
     C1=np.zeros(num+1)
     C2=np.zeros(num+1)
@@ -129,7 +129,7 @@ def lire_images(root_dir, path_cvs ,num, sous_ech=2):
 
 
 
-def lire_database(path,num):
+def lire_database(path,num): # Lecture d'une ligne de la base de données CSV
     database = pd.read_csv(path)
     #on récupère le nuero d'image et les classes pour la valeur num de la base
     n_Im=database.iloc[num,0]
@@ -139,7 +139,7 @@ def lire_database(path,num):
     
     return n_Im,classe1,classe2,gabor
 
-def lire_images_et_carac(root_dir, path_cvs ,num, sous_ech=2):
+def lire_images_et_carac(root_dir, path_cvs ,num, sous_ech=2): # Lecture des images, des classes et des caractéristiques Gabor
     T=[]
     Gab=[]
     C1=np.zeros(num)
