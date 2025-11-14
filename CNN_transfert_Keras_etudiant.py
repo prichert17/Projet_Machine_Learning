@@ -21,6 +21,7 @@ from sklearn.metrics import confusion_matrix
 
 
 from sklearn.metrics import balanced_accuracy_score,classification_report
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 import utils_ClassIm as utils
 
@@ -61,6 +62,150 @@ base_ordre=database.sort_values(by=['Numero'])
 # Etude sur catégorie 2 classes ColLabels=0 ou 8 classes ColLabels= 1 uniquement
 ColLabels = 1
 
+########### visualisation des données ###########
+
+T = database.describe()  #on représente les statistiques descriptives
+print(T)
+
+############  ALD ###########
+
+
+def doALD(Xdf, group_col):
+    """
+    Réalise une Analyse Linéaire Discriminante (ALD / LDA) générique sur un DataFrame.
+    
+    Paramètres :
+    ------------
+    Xdf : pandas.DataFrame
+        Le jeu de données à analyser.
+    group_col : str
+        Nom de la colonne contenant les groupes ou classes.
+    """
+    #On va créer une copy du dataframe sans la colonne beta
+
+    Xdf = Xdf.drop(columns=['beta'])
+
+    # === Vérifications de base ===
+    if group_col not in Xdf.columns:
+        raise KeyError(f"La colonne '{group_col}' est absente du DataFrame.")
+    
+    # Colonnes numériques (toutes sauf la colonne de groupe)
+    numeric_cols = Xdf.select_dtypes(include=[np.number]).columns.tolist()
+    if group_col in numeric_cols:
+        numeric_cols.remove(group_col)
+
+    X = Xdf[numeric_cols]
+    y = Xdf[group_col]
+
+    print(f"\nVariables numériques utilisées : {numeric_cols}")
+    print(f"Nombre d'individus : {X.shape[0]}, nombre de variables : {X.shape[1]}")
+    print(f"Classes trouvées : {np.unique(y)}\n")
+
+    # === Boxplots par groupe ===
+    plt.figure(figsize=(10, 6))
+    Xdf.boxplot(column=numeric_cols, by=group_col)
+    plt.title("Boxplots des variables par groupe")
+    plt.suptitle("")  # Supprime le titre automatique ajouté par pandas
+    plt.show()
+
+    # === Moyenne par groupe ===
+    G = Xdf.groupby(group_col)[numeric_cols].mean()
+    print("Moyenne des variables par groupe :\n", G, "\n")
+
+    # === Matrice de dispersion ===
+    pd.plotting.scatter_matrix(X, figsize=(8, 8), c=pd.factorize(y)[0])
+    plt.suptitle("Matrice de dispersion (colorée par groupe)")
+    plt.show()
+
+    # === Analyse Linéaire Discriminante ===
+    lda = LinearDiscriminantAnalysis()
+    coord_lda = lda.fit_transform(X, y)
+
+    nb_axe_dis = len(np.unique(y)) - 1
+    print("Nombre d’axes discriminants :", nb_axe_dis)
+
+    # === Pouvoir discriminant ===
+    plt.figure()
+    plt.bar(np.arange(1, nb_axe_dis + 1), lda.explained_variance_ratio_)
+    plt.ylabel("Pouvoir discriminant")
+    plt.xlabel("Axes discriminants")
+    plt.title("Variance expliquée par chaque axe")
+    plt.show()
+
+    # === Projection des individus ===
+    plt.figure(figsize=(10, 8))
+    if coord_lda.shape[1] == 1:
+        # Cas où il n'y a qu'un seul axe discriminant
+        plt.scatter(coord_lda[:, 0], np.zeros_like(coord_lda[:, 0]),
+                    c=pd.factorize(y)[0], cmap="viridis")
+        plt.xlabel("Axe discriminant 1")
+        plt.title("Projection des individus (1 seul axe discriminant)")
+    else:
+        scatter = plt.scatter(coord_lda[:, 0], coord_lda[:, 1],
+                              c=pd.factorize(y)[0], cmap="viridis")
+        plt.xlabel("Axe discriminant 1")
+        plt.ylabel("Axe discriminant 2")
+        plt.title("Projection des individus dans l’espace discriminant")
+
+        handles, _ = scatter.legend_elements()
+        labels = [str(c) for c in np.unique(y)]
+        plt.legend(handles=handles, labels=labels, title="Groupes")
+
+    plt.show()
+
+    # === Centres de gravité dans l’espace discriminant ===
+# =======================
+# Centres de gravité des classes
+# =======================
+    passage = lda.scalings_
+    G_center = (G - X.mean()) @ passage
+    G_center = G_center.to_numpy()  # conversion explicite
+
+    plt.figure(figsize=(10, 8))
+    plt.scatter(coord_lda[:, 0],
+                coord_lda[:, 1] if coord_lda.shape[1] > 1 else np.zeros_like(coord_lda[:, 0]),
+                c=pd.factorize(y)[0], cmap="viridis", alpha=0.5)
+
+    if G_center.shape[1] >= 2:
+        plt.scatter(G_center[:, 0], G_center[:, 1],
+                    c="red", marker="x", s=100, label="Centres de classes")
+        plt.xlabel("Axe discriminant 1")
+        plt.ylabel("Axe discriminant 2")
+    else:
+        plt.scatter(G_center[:, 0], np.zeros_like(G_center[:, 0]),
+                    c="red", marker="x", s=100, label="Centres de classes")
+        plt.xlabel("Axe discriminant 1")
+
+    plt.legend()
+    plt.title("Centres de gravité des classes dans l’espace discriminant")
+    plt.show()
+
+
+    # === Cercle des corrélations ===
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(-1, 1)
+    plt.axhline(0, color='grey', lw=1)
+    plt.axvline(0, color='grey', lw=1)
+    cercle = plt.Circle((0, 0), 1, color='blue', fill=False)
+    ax.add_artist(cercle)
+
+    for col in numeric_cols:
+        if coord_lda.shape[1] > 1:
+            x_corr = np.corrcoef(X[col], coord_lda[:, 0])[0, 1]
+            y_corr = np.corrcoef(X[col], coord_lda[:, 1])[0, 1]
+        else:
+            x_corr = np.corrcoef(X[col], coord_lda[:, 0])[0, 1]
+            y_corr = 0
+        plt.annotate(col, (x_corr, y_corr))
+        plt.quiver(0, 0, x_corr, y_corr, color="black", scale=2)
+
+    plt.title("Cercle des corrélations")
+    plt.show()
+
+
+
+"""
 # Partie 1.2
 utils.show_database(database,1,2) # pour verifier les bases et afficher un exemple images
 
@@ -204,3 +349,5 @@ acc_class=np.arange(8)*0.0
 for i in np.arange(0,8):
     acc_class[i]=np.around(resu[str(i+2)]['precision'],3)
 resu_acc_class.append(acc_class)
+
+"""
